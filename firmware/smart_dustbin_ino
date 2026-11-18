@@ -1,0 +1,107 @@
+
+
+// --- Pin Definitions ---
+const int TRIG_PIN = 3;
+const int ECHO_PIN = 1;
+const int SERVO_PIN = 5;
+const int RED_LED_PIN = 6;
+const int GREEN_LED_PIN = 8;
+
+// --- Constants & Thresholds ---
+const float DISTANCE_OPEN_THRESHOLD = 20.0;  // cm - hand must be closer than this to open
+const float DISTANCE_CLOSE_THRESHOLD = 30.0; // cm - hand must move past this to close (hysteresis)
+const float TIMEOUT_DISTANCE = 999.0;        // cm - returned when echo times out
+
+// --- Timing Variables ---
+unsigned long previousMillis = 0;
+const long interval = 250;                   // Sample interval (ms) for responsiveness
+
+// --- State Machine ---
+enum LidState { LID_CLOSED, LID_OPEN };
+LidState currentLidState = LID_CLOSED;
+
+Servo lidServo;
+
+void setup() {
+  Serial.begin(115200);
+
+  // Configure Pins
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  pinMode(RED_LED_PIN, OUTPUT);
+  pinMode(GREEN_LED_PIN, OUTPUT);
+
+  // Initialize Servo
+  lidServo.attach(SERVO_PIN);
+  
+  // Initial State: Lid Closed, Red LED On
+  closeLid();
+  
+  Serial.println("Smart Dustbin Firmware Initialized.");
+}
+
+void loop() {
+  unsigned long currentMillis = millis();
+
+  // Non-blocking periodic sensor check
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+
+    float distance = measureDistanceCM();
+    Serial.print("Measured Distance: ");
+    if (distance >= TIMEOUT_DISTANCE) {
+      Serial.println("999 cm (Timeout / No Echo)");
+    } else {
+      Serial.print(distance);
+      Serial.println(" cm");
+    }
+
+    // Hysteresis Control Logic
+    if (currentLidState == LID_CLOSED) {
+      if (distance <= DISTANCE_OPEN_THRESHOLD) {
+        openLid();
+      }
+    } else if (currentLidState == LID_OPEN) {
+      // Close if distance exceeds the close threshold OR if timeout occurs (999 cm)
+      if (distance >= DISTANCE_CLOSE_THRESHOLD || distance >= TIMEOUT_DISTANCE) {
+        closeLid();
+      }
+    }
+  }
+}
+
+float measureDistanceCM() {
+  // Send 10-microsecond trigger pulse
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  // Read echo pulse with a 30ms timeout (~510 cm max range)
+  long duration = pulseIn(ECHO_PIN, HIGH, 30000);
+
+  if (duration == 0) {
+    return TIMEOUT_DISTANCE;
+  }
+
+  // Calculate distance in cm (Speed of sound = 0.0343 cm/µs, divided by 2 for round trip)
+  float distance = duration * 0.0343 / 2.0;
+  return distance;
+}
+
+void openLid() {
+  currentLidState = LID_OPEN;
+  lidServo.write(90);             // Rotate servo to 90 degrees
+  digitalWrite(GREEN_LED_PIN, HIGH); // Green LED on
+  digitalWrite(RED_LED_PIN, LOW);    // Red LED off
+  Serial.println("-> Action: Lid OPENED");
+}
+
+void closeLid() {
+  currentLidState = LID_CLOSED;
+  lidServo.write(0);              // Rotate servo to 0 degrees
+  digitalWrite(GREEN_LED_PIN, LOW);  // Green LED off
+  digitalWrite(RED_LED_PIN, HIGH);   // Red LED on
+  Serial.println("-> Action: Lid CLOSED");
+}
