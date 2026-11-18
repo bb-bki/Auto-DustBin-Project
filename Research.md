@@ -1,4 +1,4 @@
-# HC-SR04
+# **HC-SR04**
 ## 1. Ultrasonic Sensor Timing and Signal Constraints
 
 |Event | explanation|
@@ -32,6 +32,38 @@
 |Event|Explanation|
 |----|----|
 |**Avoiding** ***delay()***|Using a blocking delay pauses the entire GPU, freezing Serial prints, LED updates, and responsiveness.|
-|**Tick-Based Sampling**|The firmware utilises ***millis()***| to check the ultrasonic sensor at regular non-blocking intervals (e.g...every 250ms), keeping processor free to handle state transitions smoothly.
+|**Tick-Based Sampling**|The firmware utilises ***millis()***| to check the ultrasonic sensor at regular non-blocking intervals (e.g...every 250ms), keeping processor free to handle state transitions smoothly.\
+---
+<br>
+<br>
 
+# **Subsystem Design Notes: SG90 Servo Motor Actuation**
+## 1. Core Operating Principles & PWM Specifications
+|Event|Explanation|
+|----|----|
+|**Signal Requirements:** |Standard hobby servos like the SG90 are driven via **Pulse Width Modulation (PWM)** at a standard frequency of **50Hz** (meaning a complete pulse frame repeats every 20ms)|
+| **Pulse Width Mapping:** |The angular position of the servo shaft is determined by the duration of the HIGH pulse within that 20ms frame:|
 
+  - 1.0ms pulse corresponds to **0°** (fully closed).
+  - 1.5ms pulse corresponds to **90°** (midpoint).
+  - 2.0ms pulse corresponds to **180°** (fully open).
+
+|event|explanation|
+|----|----|
+| **Application Mapping for the Dustbin:**| *0°* The resting home position where the lid is completely closed. <br> *90°* The active position where the lid rotates up and clears the disposal opening.<br> *We* intentionally limit the maximum angle to 90° so the servo arm doesn't over-rotate or put unnecessary mechanical strain on the plastic chassis hinges.|
+
+## 2. Pin Mapping & Hardware Integration
+* **Control Signal:** Connected directly from **GPIO 5** on the ESP32-C3 to the servo's PWM signal line (usually orange or white wire).
+* **Power & Ground Considerations:**
+  * The SG90 operates on **5V** (red wire) and returns via ground (brown/black wire).
+  * *Critical Rule:* Never power a servo directly from the microcontroller's 3.3V logic line or rely entirely on the board's internal regulator for heavy motor current. Under load or during sudden movements, servo motors draw high current spikes that can cause voltage dropouts, triggering random brownout resets on the ESP32-C3.
+  * Always ensure the external 5V power supply shares a **common ground** with the ESP32-C3 GND pin.
+
+## 3. Firmware Logic & Non-Blocking Execution
+|Event|Explanation|
+|-----|----|
+ |**Library Integration:**| Utilizing the ESP32Servo library abstracts away manual timer calculations, allowing clean commands like lidServo.write(90) and lidServo.write(0).|
+| **Preventing Stalling / Jitter:**| Once the servo reaches its target angle, holding the PWM signal active continuously provides holding torque, but updating it too frequently inside a fast loop can cause unnecessary chatter.<br><br> State checks ensure that lidServo.write() is only called *once* when a state transition actually occurs (i.e., when transitioning from LID_CLOSED to LID_OPEN), rather than flooding the servo driver every single cycle.|
+---
+<br>
+<br>
