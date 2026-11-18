@@ -10,5 +10,7 @@
 
 |Event|Explanation|
 |----|----|
-|Timeout and edge Cases| If no echo returns(e.g sound disperses or no object is present), waiting indefinitely will block the program. Implementing a **30-millisecond** (30,000µs) Timeout via pulsein() caps the maximum measurebale distance at roughly 510cm. If the pulse times out, the firmware returns a designated error/out-of-range value of **999cm**|
-|Logic level voltage protection| The sensor's **Echo** pin outputs 5V Logic, while the ESP32-C3 operates strictly on 3.3V Logic. Direct connections risk damaging|
+|**Timeout and edge Cases**| If no echo returns(e.g sound disperses or no object is present), waiting indefinitely will block the program. Implementing a **30-millisecond** (30,000µs) Timeout via pulsein() caps the maximum measurebale distance at roughly 510cm. If the pulse times out, the firmware returns a designated error/out-of-range value of **999cm**|
+|**Logic level voltage protection**| The sensor's **Echo** pin outputs ***5V*** Logic, while the ESP32-C3 operates strictly on ***3.3V*** Logic. Direct connections risk damaging the microcontroller pin, necessitating a logic-level converter (or voltage divided circuit) on GPIO 1.|
+|||
+
